@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders')
-const { token } = require('/config.json');
+const { token } = require(__dirname + '/config.json');
 const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { AttachmentBuilder } = require('discord.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const { initJobs, addSch, remSch, getSch } = require('./scheduler.js');
 
@@ -39,6 +40,9 @@ async function registerCommands() {
                 option.setName('channel')
                     .setDescription('Channel to cancel')
                     .setRequired(true)),
+        new SlashCommandBuilder()
+            .setName('gif')
+            .setDescription('Sends a cat GIF')
     ].map(cmd => cmd.toJSON());
 
     try {
@@ -70,11 +74,30 @@ client.on(Events.InteractionCreate, async interaction => {
             if (!req.ok) throw new Error(`Error ${req.status}`);
             const data = await req.json();
             const url = data.url;
-            await interaction.reply(`${url}`)
+            await interaction.reply(url)
         } catch (error) {
             console.error(error);
         }
     }
+
+    // gif
+    if (commandName === 'gif') {
+        try {
+            await interaction.deferReply();
+            const res = await fetch('https://cataas.com/cat/gif?json=true');
+            if (!res.ok) throw new Error(`CATAAS error ${res.status}`);
+            const data = await res.json();
+            const gifRes = await fetch(data.url);
+            if (!gifRes.ok) throw new Error(`Failed to download GIF: ${gifRes.status}`);
+            const buffer = Buffer.from(await gifRes.arrayBuffer());
+            const gif = new AttachmentBuilder(buffer, { name: `cat-${Date.now()}.gif` });
+            await interaction.editReply({ files: [gif] });
+        } catch (err) {
+            console.error('Failed to send cat GIF:', err);
+            await interaction.editReply('Error: Failed to send. Cats may be tired.');
+        }
+    }
+    
 
     // list
     if (commandName === 'list') {
