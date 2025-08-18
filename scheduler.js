@@ -36,15 +36,19 @@ function addSch(guildId, channelId, time, client, skipSave = false) {
     const job = cron.schedule(cronTime, async () => {
         const channel = await client.channels.fetch(channelId)
         try {
-            if (!channel) return;
-            const req = await fetch(`https://cataas.com/cat?json=true`);
-            if (!req.ok) throw new Error(`HTTP error ${req.status}`);
-            const data = await req.json();
-            channel.send(data.url);
-        } catch (err) {
-            console.error(`Failed to send cat to ${channelId}:`, err);
-        }
-    })
+            await interaction.deferReply();
+            const res = await fetch(`https://cataas.com/cat?json=true`);
+            if (!res.ok) throw new Error(`CATAAS error ${res.status}`);
+            const data = await res.json();
+            const catRes = await fetch(data.url);
+            if (!catRes.ok) throw new Error(`Failed to download cat: ${res.status}`);
+            const buffer = Buffer.from(await catRes.arrayBuffer());
+            const cat = new AttachmentBuilder(buffer, { name: `catimage-${Date.now()}.gif`});
+            await interaction.editReply({ files: [cat] });
+        } catch (error) {
+            console.error('Failed to download cat', error);
+            await interaction.editReply('Error: Failed to send. Cats may be tired.');
+        }})
 
     jobs[key] = job;
     schedules.push({ guildId, channelId, time });
