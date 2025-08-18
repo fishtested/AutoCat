@@ -70,13 +70,18 @@ client.on(Events.InteractionCreate, async interaction => {
     // cat
     if (commandName === 'cat') {
         try {
-            const req = await fetch(`https://cataas.com/cat?json=true`);
-            if (!req.ok) throw new Error(`Error ${req.status}`);
-            const data = await req.json();
-            const url = data.url;
-            await interaction.reply(url)
+            await interaction.deferReply();
+            const res = await fetch(`https://cataas.com/cat?json=true`);
+            if (!res.ok) throw new Error(`CATAAS error ${res.status}`);
+            const data = await res.json();
+            const catRes = await fetch(data.url);
+            if (!catRes.ok) throw new Error(`Failed to download cat: ${res.status}`);
+            const buffer = Buffer.from(await catRes.arrayBuffer());
+            const cat = new AttachmentBuilder(buffer, { name: `catimage-${Date.now()}.gif`});
+            await interaction.editReply({ files: [cat] });
         } catch (error) {
-            console.error(error);
+            console.error('Failed to download cat', error);
+            await interaction.editReply('Error: Failed to send. Cats may be tired.');
         }
     }
 
