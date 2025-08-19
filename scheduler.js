@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const fs = require('fs');
 const schedulefile = __dirname + '/schedules.json';
+const { AttachmentBuilder } = require('discord.js');
 
 let schedules = [];
 let jobs = {};
@@ -21,7 +22,7 @@ function loadSch() {
     }
 }
 
-function addSch(guildId, channelId, time, client, skipSave = false) { 
+function addSch(guildId, channelId, time, client, type, skipSave = false) { 
     const key = `${guildId}-${channelId}`;
     const [hour, minute] = time.split(':');
     const cronTime = `${minute} ${hour} * * *`;
@@ -34,24 +35,35 @@ function addSch(guildId, channelId, time, client, skipSave = false) {
     schedules = schedules.filter(s => !(s.guildId === guildId && s.channelId === channelId));
 
     const job = cron.schedule(cronTime, async () => {
-        const channel = await client.channels.fetch(channelId)
         try {
-            await interaction.deferReply();
-            const res = await fetch(`https://cataas.com/cat?json=true`);
+            let apiUrl;
+            let ext;
+            if (type === 'GIFs') {
+                apiUrl = 'https://cataas.com/cat/gif?json=true';
+                ext = 'gif';
+                type = 'gif';
+            } else {
+                apiUrl = 'https://cataas.com/cat?json=true';
+                ext = 'jpg';
+                type = 'jpg';
+            }
+            const channel = await client.channels.fetch(channelId);
+            const res = await fetch(apiUrl);
             if (!res.ok) throw new Error(`CATAAS error ${res.status}`);
             const data = await res.json();
             const catRes = await fetch(data.url);
-            if (!catRes.ok) throw new Error(`Failed to download cat: ${res.status}`);
+            if (!catRes.ok) throw new Error(`Failed to download cat: ${catRes.status}`);
             const buffer = Buffer.from(await catRes.arrayBuffer());
-            const cat = new AttachmentBuilder(buffer, { name: `catimage-${Date.now()}.gif`});
-            await interaction.editReply({ files: [cat] });
+            const cat = new AttachmentBuilder(buffer, { name: `cat${ext}-${Date.now()}.${ext}` });
+            await channel.send({ files: [cat] });
+            console.log(`Cat ${ext} sent!`);
         } catch (error) {
             console.error('Failed to download cat', error);
-            await interaction.editReply('Error: Failed to send. Cats may be tired.');
-        }})
+        }
+    });    
 
     jobs[key] = job;
-    schedules.push({ guildId, channelId, time });
+    schedules.push({ guildId, channelId, time, type });
     if (!skipSave) saveSch();
 }
 
@@ -73,7 +85,7 @@ function getSch(guildId) {
 function initJobs(client) {
     loadSch();
     for (const s of schedules) {
-        addSch(s.guildId, s.channelId, s.time, client, true);
+        addSch(s.guildId, s.channelId, s.time, client, s.type, true);
     }
 }
 
