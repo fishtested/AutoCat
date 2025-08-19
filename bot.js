@@ -29,6 +29,15 @@ async function registerCommands() {
                 option.setName('time')
                     .setDescription('Time in 24h (HH:MM)')
                     .setRequired(true))
+            .addStringOption(option =>
+                option.setName('type')
+                .setDescription('Picture or GIF?')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Picture', value: 'pictures'},
+                    { name: 'GIF', value: 'GIFs'}
+                )
+            )
             .addChannelOption(option =>
             option.setName('channel')
                 .setDescription('Channel to send the cats')
@@ -77,7 +86,7 @@ client.on(Events.InteractionCreate, async interaction => {
             const catRes = await fetch(data.url);
             if (!catRes.ok) throw new Error(`Failed to download cat: ${res.status}`);
             const buffer = Buffer.from(await catRes.arrayBuffer());
-            const cat = new AttachmentBuilder(buffer, { name: `catimage-${Date.now()}.gif`});
+            const cat = new AttachmentBuilder(buffer, { name: `catimage-${Date.now()}.jpg`});
             await interaction.editReply({ files: [cat] });
         } catch (error) {
             console.error('Failed to download cat', error);
@@ -118,9 +127,10 @@ client.on(Events.InteractionCreate, async interaction => {
     // start
     if (commandName === 'start') {
         const time = interaction.options.getString('time');
+        const type = interaction.options.getString(`type`)
         const channel = interaction.options.getChannel('channel');
-        addSch(interaction.guildId, channel.id, time, client);
-        await interaction.reply(`Scheduled cats for <#${channel.id}> at ${time}`);
+        addSch(interaction.guildId, channel.id, time, client, type);
+        await interaction.reply(`Scheduled cat ${type} for <#${channel.id}> at ${time}`);
     }
 
     // stop
